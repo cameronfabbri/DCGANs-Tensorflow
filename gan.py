@@ -10,9 +10,9 @@ import cPickle as pickle
 import numpy as np
 
 def G(z):
-   g_fc1 = slim.fully_connected(z, 256, normalizer_fn=slim.batch_norm, activation_fn=tf.nn.relu, scope='g_fc1')
-   g_fc2 = slim.fully_connected(g_fc1, 512, normalizer_fn=slim.batch_norm, activation_fn=tf.nn.relu, scope='g_fc2')
-   g_fc3 = slim.fully_connected(g_fc2, 784, normalizer_fn=slim.batch_norm, activation_fn=tf.nn.tanh, scope='g_fc3')
+   g_fc1 = slim.fully_connected(z, 256, activation_fn=tf.nn.relu, scope='g_fc1')
+   g_fc2 = slim.fully_connected(g_fc1, 512, activation_fn=tf.nn.relu, scope='g_fc2')
+   g_fc3 = slim.fully_connected(g_fc2, 784, activation_fn=tf.nn.tanh, scope='g_fc3')
    
    print 'z:',z
    print 'g_fc1:',g_fc1
@@ -22,17 +22,17 @@ def G(z):
 
 
 def D(x):
-   d_fc1 = slim.fully_connected(x, 784, normalizer_fn=slim.batch_norm, activation_fn=tf.nn.relu, scope='d_fc1')
-   d_fc2 = slim.fully_connected(d_fc1, 512, normalizer_fn=slim.batch_norm, activation_fn=tf.nn.relu, scope='d_fc2')
-   d_fc3 = slim.fully_connected(d_fc2, 1, normalizer_fn=slim.batch_norm, activation_fn=tf.nn.sigmoid, scope='d_fc3')
-   
-   return d_fc3
+   d_fc1 = slim.fully_connected(x, 784, activation_fn=tf.nn.relu, scope='d_fc1')
+   d_fc2 = slim.fully_connected(d_fc1, 512, activation_fn=tf.nn.relu, scope='d_fc2')
+   d_fc3 = slim.fully_connected(d_fc2, 256, activation_fn=tf.nn.relu, scope='d_fc3')
+   d_fc4 = slim.fully_connected(d_fc3, 1, activation_fn=tf.nn.sigmoid, scope='d_fc4')
+   return d_fc4
 
 
 def train(mnist_train):
    with tf.Graph().as_default():
      
-      batch_size = 32
+      batch_size = 64
 
       # placeholder to keep track of the global step
       global_step = tf.Variable(0, trainable=False, name='global_step')
@@ -43,6 +43,7 @@ def train(mnist_train):
       # placeholder for the latent z vector
       z = tf.placeholder(tf.float32, [batch_size, 100], name='z')
 
+      # generate an image from noise prior z
       generated_images = G(z)
 
       # small weight factor so D doesn't go to 0
@@ -111,7 +112,7 @@ def train(mnist_train):
          
          if step%100==0:print 'epoch:',epoch_num,'step:',step,'G loss:',G_loss,' D loss:',D_loss,' time:',time.time()-s
 
-         if step%1000 == 0:
+         if step%2000 == 0:
             print
             print 'Saving model'
             print
@@ -126,7 +127,7 @@ def train(mnist_train):
             for img in gen_imgs:
                img = np.reshape(img, [28, 28])
                plt.imsave('checkpoints/gan/images/0000'+str(step)+'_'+str(c)+'.png', img)
-               if c == 10:
+               if c == 5:
                   break
                c+=1
 
