@@ -129,6 +129,7 @@ def train(mnist_train):
          
          # run G
          sess.run(G_train_op, feed_dict={z:batch_z, images:batch_images})
+         sess.run(G_train_op, feed_dict={z:batch_z, images:batch_images})
 
          # get losses WITHOUT running the networks
          G_loss, D_loss = sess.run([errG, errD], feed_dict={z:batch_z, images:batch_images})

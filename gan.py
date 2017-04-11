@@ -26,6 +26,12 @@ def D(x):
    d_fc2 = slim.fully_connected(d_fc1, 512, activation_fn=tf.nn.relu, scope='d_fc2')
    d_fc3 = slim.fully_connected(d_fc2, 256, activation_fn=tf.nn.relu, scope='d_fc3')
    d_fc4 = slim.fully_connected(d_fc3, 1, activation_fn=tf.nn.sigmoid, scope='d_fc4')
+
+   print 'x:',x
+   print 'd_fc1:',d_fc1
+   print 'd_fc2:',d_fc2
+   print 'd_fc3:',d_fc3
+   print 'd_fc4:',d_fc4
    return d_fc4
 
 
@@ -110,6 +116,10 @@ def train(mnist_train):
          # get losses WITHOUT running the networks
          G_loss, D_loss = sess.run([errG, errD], feed_dict={z:batch_z, images:batch_images})
          
+         while D_loss < 1e-4:
+            sess.run(G_train_op, feed_dict={z:batch_z, images:batch_images})
+            D_loss = sess.run([errD], feed_dict={z:batch_z, images:batch_images})
+         
          if step%100==0:print 'epoch:',epoch_num,'step:',step,'G loss:',G_loss,' D loss:',D_loss,' time:',time.time()-s
 
          if step%2000 == 0:
@@ -121,7 +131,7 @@ def train(mnist_train):
             # generate some to write out
             batch_z = np.random.normal(-1.0, 1.0, size=[batch_size, 100]).astype(np.float32)
             gen_imgs = np.asarray(sess.run(generated_images, feed_dict={z:batch_z, images:batch_images}))
-
+            random.shuffle(gen_imgs)
             # write out a few (10)
             c = 0
             for img in gen_imgs:
