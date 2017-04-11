@@ -1,0 +1,11 @@
+*.pyc
+*.*~
+*.~
+*checkpoint
+checkpoint*
+checkpoints
+*.png
+*.jpg
+images/
+images*
+image*
