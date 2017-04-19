@@ -31,8 +31,11 @@ if __name__ == '__main__':
    canvas = 1*np.ones((m*img_size[0]+(10*m)+10, n*img_size[1]+(10*n)+10), dtype=np.uint8)
    
    z = tf.placeholder(tf.float32, shape=(num_images, 100), name='z')
-   generated_images = G(z)
-   
+   if gan == 'gan':
+      generated_images = G(z)
+   if gan == 'dcgan':
+      generated_images = G(z, 75)
+
    init = tf.global_variables_initializer()
    sess = tf.Session()
    sess.run(init)
@@ -78,4 +81,4 @@ if __name__ == '__main__':
          start_y = end_y + 10
          end_y   = start_y+28
 
-   plt.imsave('results.png', canvas)
+   plt.imsave(gan+'_results.png', canvas)
