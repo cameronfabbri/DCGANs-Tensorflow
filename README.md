@@ -19,6 +19,8 @@ Results using regular GANs after about 65 epochs.
 
 ![gan](http://i.imgur.com/5m5AyrJ.png)
 
+Results of DCGANs after only 7 epochs, will train more soon.
+![dcgan](http://i.imgur.com/Vpgm14n.png)
 
 ### Training
 To train on your own, simply run `python gan.py` or `python dcgan.py`. To generate images shown
