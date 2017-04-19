@@ -15,7 +15,7 @@ a tanh activation instead of a sigmoid activation to match the range z is drawn 
 
 Tests were done using MNIST.
 
-Results after about 65 epochs.
+Results using regular GANs after about 65 epochs.
 
 ![gan](http://i.imgur.com/5m5AyrJ.png)
 
