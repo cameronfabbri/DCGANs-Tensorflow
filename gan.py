@@ -1,4 +1,4 @@
-import tensorflow.contrib.slim as slim
+import tensorflow.contrib.layers as layers
 import tensorflow as tf
 import matplotlib.pyplot as plt
 import random
@@ -9,10 +9,18 @@ import gzip
 import cPickle as pickle
 import numpy as np
 
+def lrelu(x, leak=0.2):
+   return tf.maximum(leak*x, x)
+
 def G(z):
-   g_fc1 = slim.fully_connected(z, 256, activation_fn=tf.nn.relu, scope='g_fc1')
-   g_fc2 = slim.fully_connected(g_fc1, 512, activation_fn=tf.nn.relu, scope='g_fc2')
-   g_fc3 = slim.fully_connected(g_fc2, 784, activation_fn=tf.nn.tanh, scope='g_fc3')
+   #g_fc1 = layers.fully_connected(z, 256, activation_fn=tf.nn.relu, scope='g_fc1')
+   #g_fc2 = layers.fully_connected(g_fc1, 512, activation_fn=tf.nn.relu, scope='g_fc2')
+   #g_fc3 = layers.fully_connected(g_fc2, 784, activation_fn=tf.nn.tanh, scope='g_fc3')
+
+   
+   g_fc1 = layers.fully_connected(z, 1200, activation_fn=tf.nn.relu, scope='g_fc1')
+   g_fc2 = layers.fully_connected(g_fc1, 1200, activation_fn=tf.nn.relu, scope='g_fc2')
+   g_fc3 = layers.fully_connected(g_fc2, 784, activation_fn=tf.nn.tanh, scope='g_fc3')
    
    print 'z:',z
    print 'g_fc1:',g_fc1
@@ -22,23 +30,30 @@ def G(z):
 
 
 def D(x):
-   d_fc1 = slim.fully_connected(x, 784, activation_fn=tf.nn.relu, scope='d_fc1')
-   d_fc2 = slim.fully_connected(d_fc1, 512, activation_fn=tf.nn.relu, scope='d_fc2')
-   d_fc3 = slim.fully_connected(d_fc2, 256, activation_fn=tf.nn.relu, scope='d_fc3')
-   d_fc4 = slim.fully_connected(d_fc3, 1, activation_fn=tf.nn.sigmoid, scope='d_fc4')
+   #d_fc1 = layers.fully_connected(x, 784, activation_fn=tf.nn.relu, scope='d_fc1')
+   #d_fc2 = layers.fully_connected(d_fc1, 512, activation_fn=tf.nn.relu, scope='d_fc2')
+   #d_fc3 = layers.fully_connected(d_fc2, 256, activation_fn=tf.nn.relu, scope='d_fc3')
+   #d_fc4 = layers.fully_connected(d_fc3, 1, activation_fn=tf.nn.sigmoid, scope='d_fc4')
+
+   d_fc1 = layers.fully_connected(x, 240, activation_fn=None, scope='d_fc1')
+   d_fc1 = lrelu(d_fc1)
+   
+   d_fc2 = layers.fully_connected(d_fc1, 240, activation_fn=None, scope='d_fc2')
+   d_fc2 = lrelu(d_fc2)
+   
+   d_fc3 = layers.fully_connected(d_fc2, 1, activation_fn=tf.nn.sigmoid, scope='d_fc3')
 
    print 'x:',x
    print 'd_fc1:',d_fc1
    print 'd_fc2:',d_fc2
    print 'd_fc3:',d_fc3
-   print 'd_fc4:',d_fc4
-   return d_fc4
+   return d_fc3
 
 
 def train(mnist_train):
    with tf.Graph().as_default():
      
-      batch_size = 64
+      batch_size = 32
 
       # placeholder to keep track of the global step
       global_step = tf.Variable(0, trainable=False, name='global_step')
@@ -74,7 +89,6 @@ def train(mnist_train):
       G_train_op = tf.train.AdamOptimizer(learning_rate=1e-4).minimize(errG, var_list=g_vars, global_step=global_step)
       D_train_op = tf.train.AdamOptimizer(learning_rate=1e-4).minimize(errD, var_list=d_vars)
 
-
       saver = tf.train.Saver(max_to_keep=1)
    
       init = tf.group(tf.global_variables_initializer(), tf.local_variables_initializer())
@@ -104,8 +118,8 @@ def train(mnist_train):
          # get random images from the training set
          batch_images = random.sample(mnist_train, batch_size)
          
-         # generate z from a normal distribution between [-1, 1] of length 100
-         batch_z = np.random.normal(-1.0, 1.0, size=[batch_size, 100]).astype(np.float32)
+         # generate z from a normal/uniform distribution between [-1, 1] of length 100
+         batch_z = np.random.uniform(-1.0, 1.0, size=[batch_size, 100]).astype(np.float32)
 
          # run D
          sess.run(D_train_op, feed_dict={z:batch_z, images:batch_images})

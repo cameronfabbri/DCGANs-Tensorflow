@@ -1,4 +1,4 @@
-import tensorflow.contrib.slim as slim
+import tensorflow.contrib.layers as layers
 import tensorflow as tf
 import matplotlib.pyplot as plt
 import random
@@ -17,37 +17,38 @@ def lrelu(x, leak=0.2, name='lrelu'):
    return tf.maximum(leak*x, x)
 
 def G(z, batch_size):
-   z = slim.fully_connected(z, 4*4*1024, normalizer_fn=slim.batch_norm, activation_fn=tf.identity, scope='g_z')
+   z = layers.fully_connected(z, 4*4*1024, normalizer_fn=layers.batch_norm, activation_fn=tf.identity, scope='g_z')
    z = tf.reshape(z, [batch_size, 4, 4, 1024])
 
-   conv1 = slim.convolution2d_transpose(z, 512, 5, stride=2, normalizer_fn=slim.batch_norm, activation_fn=tf.nn.relu, scope='g_conv1')
+   conv1 = layers.convolution2d_transpose(z, 512, 5, stride=2, normalizer_fn=layers.batch_norm, activation_fn=tf.nn.relu, scope='g_conv1')
 
-   conv2 = slim.convolution2d_transpose(conv1, 256, 5, stride=2, normalizer_fn=slim.batch_norm, activation_fn=tf.nn.relu, scope='g_conv2')
+   conv2 = layers.convolution2d_transpose(conv1, 256, 5, stride=2, normalizer_fn=layers.batch_norm, activation_fn=tf.nn.relu, scope='g_conv2')
    
-   conv3 = slim.convolution2d_transpose(conv2, 128, 5, stride=2, normalizer_fn=slim.batch_norm, activation_fn=tf.nn.relu, scope='g_conv3')
+   conv3 = layers.convolution2d_transpose(conv2, 128, 5, stride=2, normalizer_fn=layers.batch_norm, activation_fn=tf.nn.relu, scope='g_conv3')
 
-   conv4 = slim.convolution2d_transpose(conv3, 1, 5, stride=2, activation_fn=tf.nn.tanh, scope='g_conv4')
+   conv4 = layers.convolution2d_transpose(conv3, 1, 5, stride=2, activation_fn=tf.nn.tanh, scope='g_conv4')
+   
    conv4 = conv4[:,:28,:28,:]
    return conv4
 
 def D(x):
 
-   conv1 = slim.conv2d(x, 64, 5, stride=2, activation_fn=None, scope='d_conv1')
+   conv1 = layers.conv2d(x, 64, 5, stride=2, activation_fn=None, scope='d_conv1')
    conv1 = lrelu(conv1)
 
-   conv2 = slim.conv2d(conv1, 128, 5, stride=2, normalizer_fn=slim.batch_norm, activation_fn=None, scope='d_conv2')
+   conv2 = layers.conv2d(conv1, 128, 5, stride=2, normalizer_fn=layers.batch_norm, activation_fn=None, scope='d_conv2')
    conv2 = lrelu(conv2)
 
-   conv3 = slim.conv2d(conv2, 256, 5, stride=2, normalizer_fn=slim.batch_norm, activation_fn=None, scope='d_conv3')
+   conv3 = layers.conv2d(conv2, 256, 5, stride=2, normalizer_fn=layers.batch_norm, activation_fn=None, scope='d_conv3')
    conv3 = lrelu(conv3)
 
-   conv4 = slim.conv2d(conv3, 512, 5, stride=2, normalizer_fn=slim.batch_norm, activation_fn=None, scope='d_conv4')
+   conv4 = layers.conv2d(conv3, 512, 5, stride=2, normalizer_fn=layers.batch_norm, activation_fn=None, scope='d_conv4')
    conv4 = lrelu(conv4)
    
-   conv5 = slim.conv2d(conv4, 1, 4, stride=1, normalizer_fn=slim.batch_norm, activation_fn=None, scope='d_conv5')
+   conv5 = layers.conv2d(conv4, 1, 4, stride=1, normalizer_fn=layers.batch_norm, activation_fn=None, scope='d_conv5')
    conv5 = lrelu(conv5)
 
-   fc1 = slim.fully_connected(slim.flatten(conv5), 1, scope='d_fc1', activation_fn=None)
+   fc1 = layers.fully_connected(layers.flatten(conv5), 1, scope='d_fc1', activation_fn=None)
    fc1 = tf.nn.sigmoid(fc1)
 
    return fc1
