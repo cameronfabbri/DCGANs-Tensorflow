@@ -57,7 +57,7 @@ def D(x):
 def train(mnist_train):
    with tf.Graph().as_default():
      
-      batch_size = 64
+      batch_size = 32
 
       # placeholder to keep track of the global step
       global_step = tf.Variable(0, trainable=False, name='global_step')
@@ -100,7 +100,7 @@ def train(mnist_train):
       sess.run(init)
 
       # load previous checkpoint if there is one
-      ckpt = tf.train.get_checkpoint_state('checkpoints/gan/')
+      ckpt = tf.train.get_checkpoint_state('checkpoints/dcgan/')
       if ckpt and ckpt.model_checkpoint_path:
          try:
             saver.restore(sess, ckpt.model_checkpoint_path)
