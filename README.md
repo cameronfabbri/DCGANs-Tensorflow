@@ -18,6 +18,7 @@ Tests were done using MNIST.
 Results using regular GANs after about 65 epochs.
 ![gan](http://i.imgur.com/5m5AyrJ.png)
 
+
 Results of DCGANs after only 4 epochs.
 ![dcgan](http://i.imgur.com/dkuKVCp.png)
 
