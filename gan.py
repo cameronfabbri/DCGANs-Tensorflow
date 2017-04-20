@@ -13,14 +13,9 @@ def lrelu(x, leak=0.2):
    return tf.maximum(leak*x, x)
 
 def G(z):
-   #g_fc1 = layers.fully_connected(z, 256, activation_fn=tf.nn.relu, scope='g_fc1')
-   #g_fc2 = layers.fully_connected(g_fc1, 512, activation_fn=tf.nn.relu, scope='g_fc2')
-   #g_fc3 = layers.fully_connected(g_fc2, 784, activation_fn=tf.nn.tanh, scope='g_fc3')
-
-   
    g_fc1 = layers.fully_connected(z, 1200, activation_fn=tf.nn.relu, scope='g_fc1')
    g_fc2 = layers.fully_connected(g_fc1, 1200, activation_fn=tf.nn.relu, scope='g_fc2')
-   g_fc3 = layers.fully_connected(g_fc2, 784, activation_fn=tf.nn.tanh, scope='g_fc3')
+   g_fc3 = layers.fully_connected(g_fc2, 784, activation_fn=tf.nn.sigmoid, scope='g_fc3')
    
    print 'z:',z
    print 'g_fc1:',g_fc1
@@ -29,19 +24,18 @@ def G(z):
    return g_fc3
 
 
-def D(x):
-   #d_fc1 = layers.fully_connected(x, 784, activation_fn=tf.nn.relu, scope='d_fc1')
-   #d_fc2 = layers.fully_connected(d_fc1, 512, activation_fn=tf.nn.relu, scope='d_fc2')
-   #d_fc3 = layers.fully_connected(d_fc2, 256, activation_fn=tf.nn.relu, scope='d_fc3')
-   #d_fc4 = layers.fully_connected(d_fc3, 1, activation_fn=tf.nn.sigmoid, scope='d_fc4')
+def D(x,reuse=False):
 
-   d_fc1 = layers.fully_connected(x, 240, activation_fn=None, scope='d_fc1')
-   d_fc1 = lrelu(d_fc1)
-   
-   d_fc2 = layers.fully_connected(d_fc1, 240, activation_fn=None, scope='d_fc2')
-   d_fc2 = lrelu(d_fc2)
-   
-   d_fc3 = layers.fully_connected(d_fc2, 1, activation_fn=tf.nn.sigmoid, scope='d_fc3')
+   sc = tf.get_variable_scope()
+   with tf.variable_scope(sc, reuse=reuse):
+
+      d_fc1 = layers.fully_connected(x, 1200, activation_fn=None, scope='d_fc1')
+      d_fc1 = lrelu(d_fc1)
+      
+      d_fc2 = layers.fully_connected(d_fc1, 240, activation_fn=None, scope='d_fc2')
+      d_fc2 = lrelu(d_fc2)
+
+      d_fc3 = layers.fully_connected(d_fc2, 1, activation_fn=tf.nn.sigmoid, scope='d_fc3')
 
    print 'x:',x
    print 'd_fc1:',d_fc1
@@ -67,18 +61,14 @@ def train(mnist_train):
       # generate an image from noise prior z
       generated_images = G(z)
 
-      # small weight factor so D doesn't go to 0
-      e = 1e-12
-
-      # loss of D on real images
       D_real = D(images)
-      D_fake = D(generated_images)
+      D_fake = D(generated_images, reuse=True)
       
       # final objective function for D
-      errD = tf.reduce_mean(-(tf.log(D_real+e)+tf.log(1-D_fake+e)))
+      errD = tf.reduce_mean(-(tf.log(D_real)+tf.log(1-D_fake)))
 
       # instead of minimizing (1-D(G(z)), maximize D(G(z))
-      errG = tf.reduce_mean(-tf.log(D_fake + e))
+      errG = tf.reduce_mean(-tf.log(D_fake))
    
       # get all trainable variables, and split by network G and network D
       t_vars = tf.trainable_variables()
@@ -94,6 +84,17 @@ def train(mnist_train):
       init = tf.group(tf.global_variables_initializer(), tf.local_variables_initializer())
       sess = tf.Session(config=tf.ConfigProto(log_device_placement=False))
       sess.run(init)
+   
+   
+      # tensorboard summaries
+      try: tf.summary.scalar('d_loss', tf.reduce_mean(errD))
+      except:pass
+      try: tf.summary.scalar('g_loss', tf.reduce_mean(errG))
+      except:pass
+
+      # write out logs for tensorboard to the checkpointSdir
+      summary_writer = tf.summary.FileWriter('checkpoints/gan/logs/', graph=tf.get_default_graph())
+
 
       # load previous checkpoint if there is one
       ckpt = tf.train.get_checkpoint_state('checkpoints/gan/')
@@ -106,6 +107,7 @@ def train(mnist_train):
             pass
 
 
+      merged_summary_op = tf.summary.merge_all()
       # training loop
       step = sess.run(global_step)
       num_train = len(mnist_train)
@@ -128,7 +130,9 @@ def train(mnist_train):
          sess.run(G_train_op, feed_dict={z:batch_z, images:batch_images})
 
          # get losses WITHOUT running the networks
-         G_loss, D_loss = sess.run([errG, errD], feed_dict={z:batch_z, images:batch_images})
+         #G_loss, D_loss = sess.run([errG, errD], feed_dict={z:batch_z, images:batch_images})
+         G_loss, D_loss, summary = sess.run([errG, errD, merged_summary_op], feed_dict={z:batch_z, images:batch_images})
+         summary_writer.add_summary(summary, step)
          
          while D_loss < 1e-4:
             sess.run(G_train_op, feed_dict={z:batch_z, images:batch_images})
@@ -136,7 +140,7 @@ def train(mnist_train):
          
          if step%100==0:print 'epoch:',epoch_num,'step:',step,'G loss:',G_loss,' D loss:',D_loss,' time:',time.time()-s
 
-         if step%2000 == 0:
+         if step%5000 == 0:
             print
             print 'Saving model'
             print
@@ -163,6 +167,8 @@ if __name__ == '__main__':
    try: os.mkdir('checkpoints/gan/')
    except: pass
    try: os.mkdir('checkpoints/gan/images/')
+   except: pass
+   try: os.mkdir('checkpoints/gan/logs/')
    except: pass
    
    url = 'http://deeplearning.net/data/mnist/mnist.pkl.gz'
