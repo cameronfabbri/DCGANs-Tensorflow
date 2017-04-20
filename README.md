@@ -20,6 +20,7 @@ Results using regular GANs after about 65 epochs.
 
 
 Results of DCGANs after only 4 epochs.
+
 ![dcgan](http://i.imgur.com/dkuKVCp.png)
 
 ### Training
