@@ -31,25 +31,28 @@ def G(z, batch_size):
    conv4 = conv4[:,:28,:28,:]
    return conv4
 
-def D(x):
-
-   conv1 = layers.conv2d(x, 64, 5, stride=2, activation_fn=None, scope='d_conv1')
-   conv1 = lrelu(conv1)
-
-   conv2 = layers.conv2d(conv1, 128, 5, stride=2, normalizer_fn=layers.batch_norm, activation_fn=None, scope='d_conv2')
-   conv2 = lrelu(conv2)
-
-   conv3 = layers.conv2d(conv2, 256, 5, stride=2, normalizer_fn=layers.batch_norm, activation_fn=None, scope='d_conv3')
-   conv3 = lrelu(conv3)
-
-   conv4 = layers.conv2d(conv3, 512, 5, stride=2, normalizer_fn=layers.batch_norm, activation_fn=None, scope='d_conv4')
-   conv4 = lrelu(conv4)
+def D(x, reuse=False):
    
-   conv5 = layers.conv2d(conv4, 1, 4, stride=1, normalizer_fn=layers.batch_norm, activation_fn=None, scope='d_conv5')
-   conv5 = lrelu(conv5)
+   sc = tf.get_variable_scope()
+   with tf.variable_scope(sc, reuse=reuse):
 
-   fc1 = layers.fully_connected(layers.flatten(conv5), 1, scope='d_fc1', activation_fn=None)
-   fc1 = tf.nn.sigmoid(fc1)
+      conv1 = layers.conv2d(x, 64, 5, stride=2, activation_fn=None, scope='d_conv1')
+      conv1 = lrelu(conv1)
+
+      conv2 = layers.conv2d(conv1, 128, 5, stride=2, normalizer_fn=layers.batch_norm, activation_fn=None, scope='d_conv2')
+      conv2 = lrelu(conv2)
+
+      conv3 = layers.conv2d(conv2, 256, 5, stride=2, normalizer_fn=layers.batch_norm, activation_fn=None, scope='d_conv3')
+      conv3 = lrelu(conv3)
+
+      conv4 = layers.conv2d(conv3, 512, 5, stride=2, normalizer_fn=layers.batch_norm, activation_fn=None, scope='d_conv4')
+      conv4 = lrelu(conv4)
+      
+      conv5 = layers.conv2d(conv4, 1, 4, stride=1, normalizer_fn=layers.batch_norm, activation_fn=None, scope='d_conv5')
+      conv5 = lrelu(conv5)
+
+      fc1 = layers.fully_connected(layers.flatten(conv5), 1, scope='d_fc1', activation_fn=None)
+      fc1 = tf.nn.sigmoid(fc1)
 
    return fc1
 
@@ -57,7 +60,7 @@ def D(x):
 def train(mnist_train):
    with tf.Graph().as_default():
      
-      batch_size = 32
+      batch_size = 128
 
       # placeholder to keep track of the global step
       global_step = tf.Variable(0, trainable=False, name='global_step')
@@ -90,14 +93,23 @@ def train(mnist_train):
       g_vars = [var for var in t_vars if 'g_' in var.name]
 
       # training operators for G and D
-      G_train_op = tf.train.AdamOptimizer(learning_rate=1e-4).minimize(errG, var_list=g_vars, global_step=global_step)
-      D_train_op = tf.train.AdamOptimizer(learning_rate=1e-4).minimize(errD, var_list=d_vars)
+      G_train_op = tf.train.AdamOptimizer(learning_rate=0.0002, beta1=0.5).minimize(errG, var_list=g_vars, global_step=global_step)
+      D_train_op = tf.train.AdamOptimizer(learning_rate=0.0002, beta1=0.5).minimize(errD, var_list=d_vars)
 
       saver = tf.train.Saver(max_to_keep=1)
    
       init = tf.group(tf.global_variables_initializer(), tf.local_variables_initializer())
       sess = tf.Session(config=tf.ConfigProto(log_device_placement=False))
       sess.run(init)
+      
+      # tensorboard summaries
+      try: tf.summary.scalar('d_loss', tf.reduce_mean(errD))
+      except:pass
+      try: tf.summary.scalar('g_loss', tf.reduce_mean(errG))
+      except:pass
+
+      # write out logs for tensorboard to the checkpointSdir
+      summary_writer = tf.summary.FileWriter('checkpoints/dcgan/logs/', graph=tf.get_default_graph())
 
       # load previous checkpoint if there is one
       ckpt = tf.train.get_checkpoint_state('checkpoints/dcgan/')
@@ -110,6 +122,7 @@ def train(mnist_train):
             pass
 
 
+      merged_summary_op = tf.summary.merge_all()
       # training loop
       step = sess.run(global_step)
       num_train = len(mnist_train)
@@ -133,11 +146,12 @@ def train(mnist_train):
          sess.run(G_train_op, feed_dict={z:batch_z, images:batch_images})
 
          # get losses WITHOUT running the networks
-         G_loss, D_loss = sess.run([errG, errD], feed_dict={z:batch_z, images:batch_images})
+         G_loss, D_loss, summary = sess.run([errG, errD, merged_summary_op], feed_dict={z:batch_z, images:batch_images})
+         summary_writer.add_summary(summary, step)
          
          if step%10==0:print 'epoch:',epoch_num,'step:',step,'G loss:',G_loss,' D loss:',D_loss,' time:',time.time()-s
 
-         if step%1000 == 0:
+         if step%500 == 0:
             print
             print 'Saving model'
             print
@@ -164,6 +178,8 @@ if __name__ == '__main__':
    try: os.mkdir('checkpoints/dcgan/')
    except: pass
    try: os.mkdir('checkpoints/dcgan/images/')
+   except: pass
+   try: os.mkdir('checkpoints/dcgan/logs/')
    except: pass
    
    url = 'http://deeplearning.net/data/mnist/mnist.pkl.gz'
