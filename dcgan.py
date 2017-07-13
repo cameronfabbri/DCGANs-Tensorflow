@@ -1,4 +1,3 @@
-import tensorflow.contrib.layers as layers
 import tensorflow as tf
 import matplotlib.pyplot as plt
 import random
@@ -9,6 +8,25 @@ import gzip
 import cPickle as pickle
 import numpy as np
 
+selu_ = 1
+batch_size = 128
+
+'''
+   Batch normalization
+   https://arxiv.org/abs/1502.03167
+'''
+def bn(x):
+   return tf.layers.batch_normalization(x)
+
+'''
+   Self normalizing neural networks paper
+   https://arxiv.org/pdf/1706.02515.pdf
+'''
+def selu(x):
+   alpha = 1.6732632423543772848170429916717
+   scale = 1.0507009873554804934193349852946
+   return scale*tf.where(x>=0.0, x, alpha*tf.nn.elu(x))
+
 '''
    Leaky RELU
    https://arxiv.org/pdf/1502.01852.pdf
@@ -17,42 +35,48 @@ def lrelu(x, leak=0.2, name='lrelu'):
    return tf.maximum(leak*x, x)
 
 def G(z, batch_size):
-   z = layers.fully_connected(z, 4*4*1024, normalizer_fn=layers.batch_norm, activation_fn=tf.identity, scope='g_z')
+   z = tf.layers.dense(z, 4*4*1024, name='g_z')
    z = tf.reshape(z, [batch_size, 4, 4, 1024])
 
-   conv1 = layers.convolution2d_transpose(z, 512, 5, stride=2, normalizer_fn=layers.batch_norm, activation_fn=tf.nn.relu, scope='g_conv1')
+   conv1 = tf.layers.conv2d_transpose(z, 512, 5, strides=2, name='g_conv1', padding='SAME')
+   if selu_: conv1 = selu(conv1)
+   else: conv1 = relu(bn(conv1))
 
-   conv2 = layers.convolution2d_transpose(conv1, 256, 5, stride=2, normalizer_fn=layers.batch_norm, activation_fn=tf.nn.relu, scope='g_conv2')
+   conv2 = tf.layers.conv2d_transpose(conv1, 256, 5, strides=2, name='g_conv2', padding='SAME')
+   if selu_: conv2 = selu(conv2)
+   else: conv2 = relu(bn(conv2))
    
-   conv3 = layers.convolution2d_transpose(conv2, 128, 5, stride=2, normalizer_fn=layers.batch_norm, activation_fn=tf.nn.relu, scope='g_conv3')
+   conv3 = tf.layers.conv2d_transpose(conv2, 128, 5, strides=2, name='g_conv3', padding='SAME')
+   if selu_: conv3 = selu(conv3)
+   else: conv3 = relu(bn(conv3))
 
-   conv4 = layers.convolution2d_transpose(conv3, 1, 5, stride=2, activation_fn=tf.nn.tanh, scope='g_conv4')
+   conv4 = tf.layers.conv2d_transpose(conv3, 1, 5, strides=2, name='g_conv4', padding='SAME')
+   if selu_: conv4 = selu(conv4)
+   else: conv4 = relu(bn(conv4))
    
    conv4 = conv4[:,:28,:28,:]
    return conv4
 
 def D(x, reuse=False):
+
+   conv1 = tf.layers.conv2d(x, 64, 5, strides=2, name='d_conv1', reuse=reuse, padding='SAME')
+   conv1 = lrelu(conv1)
    
-   sc = tf.get_variable_scope()
-   with tf.variable_scope(sc, reuse=reuse):
+   conv2 = tf.layers.conv2d(conv1, 128, 5, strides=2, name='d_conv2', reuse=reuse, padding='SAME')
+   conv2 = lrelu(conv2)
+   
+   conv3 = tf.layers.conv2d(conv2, 256, 5, strides=2, name='d_conv3', reuse=reuse, padding='SAME')
+   conv3 = lrelu(conv3)
 
-      conv1 = layers.conv2d(x, 64, 5, stride=2, activation_fn=None, scope='d_conv1')
-      conv1 = lrelu(conv1)
+   conv4 = tf.layers.conv2d(conv3, 512, 5, strides=2, name='d_conv4', reuse=reuse, padding='SAME')
+   conv4 = lrelu(conv4)
+   
+   conv5 = tf.layers.conv2d(conv4, 1, 4, strides=1, name='d_conv5', reuse=reuse, padding='SAME')
+   conv5 = lrelu(conv5)
+   conv5 = tf.reshape(conv5, [batch_size, -1])
 
-      conv2 = layers.conv2d(conv1, 128, 5, stride=2, normalizer_fn=layers.batch_norm, activation_fn=None, scope='d_conv2')
-      conv2 = lrelu(conv2)
-
-      conv3 = layers.conv2d(conv2, 256, 5, stride=2, normalizer_fn=layers.batch_norm, activation_fn=None, scope='d_conv3')
-      conv3 = lrelu(conv3)
-
-      conv4 = layers.conv2d(conv3, 512, 5, stride=2, normalizer_fn=layers.batch_norm, activation_fn=None, scope='d_conv4')
-      conv4 = lrelu(conv4)
-      
-      conv5 = layers.conv2d(conv4, 1, 4, stride=1, normalizer_fn=layers.batch_norm, activation_fn=None, scope='d_conv5')
-      conv5 = lrelu(conv5)
-
-      fc1 = layers.fully_connected(layers.flatten(conv5), 1, scope='d_fc1', activation_fn=None)
-      fc1 = tf.nn.sigmoid(fc1)
+   fc1 = tf.layers.dense(conv5, 1, name='d_fc1', reuse=reuse)
+   fc1 = tf.nn.sigmoid(fc1)
 
    return fc1
 
@@ -79,7 +103,7 @@ def train(mnist_train):
 
       # loss of D on real images
       D_real = D(images)
-      D_fake = D(generated_images)
+      D_fake = D(generated_images, reuse=True)
 
       # final objective function for D
       errD = tf.reduce_mean(-(tf.log(D_real+e)+tf.log(1-D_fake+e)))
@@ -155,7 +179,7 @@ def train(mnist_train):
             print
             print 'Saving model'
             print
-            saver.save(sess, 'checkpoints/dcgan/checkpoint-', global_step=global_step)
+            saver.save(sess, 'checkpoints/dcgan/selu_'+str(selu_)+'/checkpoint-', global_step=global_step)
 
             # generate some to write out
             batch_z = np.random.normal(-1.0, 1.0, size=[batch_size, 100]).astype(np.float32)
@@ -165,7 +189,7 @@ def train(mnist_train):
             c = 0
             for img in gen_imgs:
                img = np.reshape(img, [28, 28])
-               plt.imsave('checkpoints/dcgan/images/0000'+str(step)+'_'+str(c)+'.png', img)
+               plt.imsave('checkpoints/dcgan/selu_'+str(selu_)+'/images/0000'+str(step)+'_'+str(c)+'.png', img)
                if c == 5:
                   break
                c+=1
@@ -173,14 +197,10 @@ def train(mnist_train):
 
 if __name__ == '__main__':
 
-   try: os.mkdir('checkpoints/')
-   except: pass
-   try: os.mkdir('checkpoints/dcgan/')
-   except: pass
-   try: os.mkdir('checkpoints/dcgan/images/')
-   except: pass
-   try: os.mkdir('checkpoints/dcgan/logs/')
-   except: pass
+   try: os.makedirs('checkpoints/dcgan/selu_'+str(selu_)+'/logs/')
+   except: raise
+   try: os.makedirs('checkpoints/dcgan/selu_'+str(selu_)+'/images/')
+   except: raise
    
    url = 'http://deeplearning.net/data/mnist/mnist.pkl.gz'
 
