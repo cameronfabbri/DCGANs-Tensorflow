@@ -8,7 +8,7 @@ import gzip
 import cPickle as pickle
 import numpy as np
 
-selu_ = 1
+selu_ = 0
 batch_size = 128
 
 '''
@@ -23,6 +23,7 @@ def bn(x):
    https://arxiv.org/pdf/1706.02515.pdf
 '''
 def selu(x):
+   print 'Using SELU'
    alpha = 1.6732632423543772848170429916717
    scale = 1.0507009873554804934193349852946
    return scale*tf.where(x>=0.0, x, alpha*tf.nn.elu(x))
@@ -33,6 +34,9 @@ def selu(x):
 '''
 def lrelu(x, leak=0.2, name='lrelu'):
    return tf.maximum(leak*x, x)
+
+def relu(x):
+   return tf.nn.relu(x)
 
 def G(z, batch_size):
    z = tf.layers.dense(z, 4*4*1024, name='g_z')
@@ -51,8 +55,7 @@ def G(z, batch_size):
    else: conv3 = relu(bn(conv3))
 
    conv4 = tf.layers.conv2d_transpose(conv3, 1, 5, strides=2, name='g_conv4', padding='SAME')
-   if selu_: conv4 = selu(conv4)
-   else: conv4 = relu(bn(conv4))
+   conv4 = tf.nn.tanh(bn(conv4))
    
    conv4 = conv4[:,:28,:28,:]
    return conv4
@@ -63,17 +66,18 @@ def D(x, reuse=False):
    conv1 = lrelu(conv1)
    
    conv2 = tf.layers.conv2d(conv1, 128, 5, strides=2, name='d_conv2', reuse=reuse, padding='SAME')
-   conv2 = lrelu(conv2)
+   conv2 = lrelu(bn(conv2))
    
    conv3 = tf.layers.conv2d(conv2, 256, 5, strides=2, name='d_conv3', reuse=reuse, padding='SAME')
-   conv3 = lrelu(conv3)
+   conv3 = lrelu(bn(conv3))
 
    conv4 = tf.layers.conv2d(conv3, 512, 5, strides=2, name='d_conv4', reuse=reuse, padding='SAME')
-   conv4 = lrelu(conv4)
+   conv4 = lrelu(bn(conv4))
    
-   conv5 = tf.layers.conv2d(conv4, 1, 4, strides=1, name='d_conv5', reuse=reuse, padding='SAME')
-   conv5 = lrelu(conv5)
-   conv5 = tf.reshape(conv5, [batch_size, -1])
+   #conv5 = tf.layers.conv2d(conv4, 1, 4, strides=1, name='d_conv5', reuse=reuse, padding='SAME')
+   #conv5 = lrelu(bn(conv5))
+
+   conv5 = tf.reshape(conv4, [batch_size, -1])
 
    fc1 = tf.layers.dense(conv5, 1, name='d_fc1', reuse=reuse)
    fc1 = tf.nn.sigmoid(fc1)
@@ -133,10 +137,10 @@ def train(mnist_train):
       except:pass
 
       # write out logs for tensorboard to the checkpointSdir
-      summary_writer = tf.summary.FileWriter('checkpoints/dcgan/logs/', graph=tf.get_default_graph())
+      summary_writer = tf.summary.FileWriter('checkpoints/dcgan/selu_'+str(selu_)+'/logs/', graph=tf.get_default_graph())
 
       # load previous checkpoint if there is one
-      ckpt = tf.train.get_checkpoint_state('checkpoints/dcgan/')
+      ckpt = tf.train.get_checkpoint_state('checkpoints/dcgan/selu_/'+str(selu_)+'/')
       if ckpt and ckpt.model_checkpoint_path:
          try:
             saver.restore(sess, ckpt.model_checkpoint_path)
@@ -167,7 +171,6 @@ def train(mnist_train):
          
          # run G
          sess.run(G_train_op, feed_dict={z:batch_z, images:batch_images})
-         sess.run(G_train_op, feed_dict={z:batch_z, images:batch_images})
 
          # get losses WITHOUT running the networks
          G_loss, D_loss, summary = sess.run([errG, errD, merged_summary_op], feed_dict={z:batch_z, images:batch_images})
@@ -175,7 +178,7 @@ def train(mnist_train):
          
          if step%10==0:print 'epoch:',epoch_num,'step:',step,'G loss:',G_loss,' D loss:',D_loss,' time:',time.time()-s
 
-         if step%500 == 0:
+         if step%100 == 0:
             print
             print 'Saving model'
             print
@@ -198,9 +201,9 @@ def train(mnist_train):
 if __name__ == '__main__':
 
    try: os.makedirs('checkpoints/dcgan/selu_'+str(selu_)+'/logs/')
-   except: raise
+   except: pass
    try: os.makedirs('checkpoints/dcgan/selu_'+str(selu_)+'/images/')
-   except: raise
+   except: pass
    
    url = 'http://deeplearning.net/data/mnist/mnist.pkl.gz'
 
