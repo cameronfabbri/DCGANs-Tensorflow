@@ -42,20 +42,20 @@ def G(z, batch_size):
    z = tf.layers.dense(z, 4*4*1024, name='g_z')
    z = tf.reshape(z, [batch_size, 4, 4, 1024])
 
-   conv1 = tf.layers.conv2d_transpose(z, 512, 5, strides=2, name='g_conv1', padding='SAME')
+   conv1 = tf.layers.conv2d_transpose(z, 256, 5, strides=2, name='g_conv1', padding='SAME')
    if selu_: conv1 = selu(conv1)
    else: conv1 = relu(bn(conv1))
 
-   conv2 = tf.layers.conv2d_transpose(conv1, 256, 5, strides=2, name='g_conv2', padding='SAME')
+   conv2 = tf.layers.conv2d_transpose(conv1, 128, 5, strides=2, name='g_conv2', padding='SAME')
    if selu_: conv2 = selu(conv2)
    else: conv2 = relu(bn(conv2))
    
-   conv3 = tf.layers.conv2d_transpose(conv2, 128, 5, strides=2, name='g_conv3', padding='SAME')
+   conv3 = tf.layers.conv2d_transpose(conv2, 64, 5, strides=2, name='g_conv3', padding='SAME')
    if selu_: conv3 = selu(conv3)
    else: conv3 = relu(bn(conv3))
 
    conv4 = tf.layers.conv2d_transpose(conv3, 1, 5, strides=2, name='g_conv4', padding='SAME')
-   conv4 = tf.nn.tanh(bn(conv4))
+   conv4 = tf.nn.tanh(conv4)
    
    conv4 = conv4[:,:28,:28,:]
    return conv4
@@ -71,13 +71,7 @@ def D(x, reuse=False):
    conv3 = tf.layers.conv2d(conv2, 256, 5, strides=2, name='d_conv3', reuse=reuse, padding='SAME')
    conv3 = lrelu(bn(conv3))
 
-   conv4 = tf.layers.conv2d(conv3, 512, 5, strides=2, name='d_conv4', reuse=reuse, padding='SAME')
-   conv4 = lrelu(bn(conv4))
-   
-   #conv5 = tf.layers.conv2d(conv4, 1, 4, strides=1, name='d_conv5', reuse=reuse, padding='SAME')
-   #conv5 = lrelu(bn(conv5))
-
-   conv5 = tf.reshape(conv4, [batch_size, -1])
+   conv5 = tf.reshape(conv3, [batch_size, -1])
 
    fc1 = tf.layers.dense(conv5, 1, name='d_fc1', reuse=reuse)
    fc1 = tf.nn.sigmoid(fc1)
@@ -192,7 +186,7 @@ def train(mnist_train):
             c = 0
             for img in gen_imgs:
                img = np.reshape(img, [28, 28])
-               plt.imsave('checkpoints/dcgan/selu_'+str(selu_)+'/images/0000'+str(step)+'_'+str(c)+'.png', img)
+               plt.imsave('checkpoints/dcgan/selu_'+str(selu_)+'/images/0000'+str(step)+'_'+str(c)+'.png', img, cmap=plt.cm.gray)
                if c == 5:
                   break
                c+=1
